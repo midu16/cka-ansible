@@ -1,5 +1,18 @@
 ---
 # tasks file for roles/cka-ansible
+- name: Create the systemgroup
+  group:
+    name: "{{system_group}}"
+    state: present
+
+- name: Create the systemuser
+  user:
+    name: "{{system_user}}"
+    comment: The systemuser choosed to administrate the kubernetes cluster
+    group: "{{system_group}}"
+    generate_ssh_key: yes
+    ssh_key_file: .ssh/id_rsa
+
 - name: Update and upgrade apt packages
   become: true
   apt:

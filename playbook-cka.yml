@@ -1,0 +1,7 @@
+---
+- hosts: all
+  roles:
+    - role: cka-ansible
+      system_user: midu
+      system_group: midu
+      

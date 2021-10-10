@@ -1,0 +1,133 @@
+---
+# tasks file for roles/cka-ansible
+- name: Update and upgrade apt packages
+  become: true
+  apt:
+    upgrade: yes
+    update_cache: yes
+    cache_valid_time: 86400
+
+- name: Install docker.io
+  become: true
+  apt:
+    name: docker.io
+    state: latest
+
+- name: Start and enable the docker.service
+  become: true
+  systemd:
+    state: started
+    enabled: yes
+    name: docker
+
+- name: Check docker.service status
+  command: systemctl status docker
+  register: result_docker_service
+  ignore_errors: yes
+
+- name: Showing the report
+  debug:
+    var: result_docker_service
+
+- name: Add apt-key for Kubernetes
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+
+- name: Add Software Repositories
+  apt_repository:
+    repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+
+- name: Package installation
+  apt:
+    pkg:
+    - kubeadm
+    - kubelet
+    - kubectl
+
+- name: Disable SWAP
+  become: yes
+  shell: |
+    swapoff -a 
+
+- name: Disable SWAP in fstab
+  become: yes
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Set system hostname
+  hostname:
+    name: "{{inventory_hostname}}"
+
+- name: Copy the kubeadm-config
+  copy:
+    src: "{{role_path}}/files/kubeadm-config.yaml"
+    dest: /tmp/kubeadm-config.yaml
+    owner: "{{system_user}}"
+    group: "{{system_group}}"
+    mode: '0770'
+    backup: yes
+
+- name: Initialize the cluster
+  shell: |
+    kubeadm init --config /tmp/kubeadm-config.yaml >> /var/log/kubeadm_init.log
+  when: "inventory_hostname in groups['master']"
+
+- name: Add the kube directory to the "{{system_user}}"
+  file:
+    state: directory
+    path: "/home/{{system_user}}/.kube"
+    mode: '0755'
+  when: "inventory_hostname in groups['master']"
+
+- name: Add the configuration
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{system_user}}/.kube"
+    owner: "{{system_user}}"
+    group: "{{system_group}}"
+    mode: '0770'
+    remote_src: yes
+  when: "inventory_hostname in groups['master']"
+   
+- name: Copy Pod Network config
+  copy:
+    src: "{{role_path}}/files/kube-flannel.yml"
+    dest: /tmp/kube-flannel.yml
+    owner: "{{system_user}}"
+    group: "{{system_group}}"
+    mode: '0770'
+    backup: yes
+  when: "inventory_hostname in groups['master']"
+ 
+- name: Deploy Pod Network to cluster
+  become: yes
+  shell: |
+    kubectl apply -f /tmp/kube-flannel.yml
+  when: "inventory_hostname in groups['master']"
+
+- name: Join command retrieved from the master node
+  shell: |
+    tail -n 2 /var/log/kubeadm_init.log
+  register: kube_register
+  when: "inventory_hostname in groups['master']"
+
+- name: Check the join command retrieved from master node
+  debug:
+    var: kube_register
+  when: "inventory_hostname in groups['master']"
+
+- name: Join worker node to cluster
+  shell: |
+    "{{kube_register}}"
+  when: "inventory_hostname in groups['node']"
+
+- name: Check all the nodes
+  shell: |
+    kubectl get nodes
+  when: "inventory_hostname in groups['node']"
+
+

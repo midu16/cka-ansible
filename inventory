@@ -1,0 +1,10 @@
+[kubernetes:children]
+master
+node
+
+[master]
+kubemaster	ansible_host="192.168.56.2"
+
+[node]
+kubenode01	ansible_host="192.168.56.3"
+kubenode02	ansible_host="192.168.56.4"

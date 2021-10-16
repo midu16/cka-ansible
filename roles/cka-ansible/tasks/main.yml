@@ -4,6 +4,7 @@
   group:
     name: "{{system_group}}"
     state: present
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'RedHat'
 
 - name: Create the systemuser
   user:
@@ -12,6 +13,7 @@
     group: "{{system_group}}"
     generate_ssh_key: yes
     ssh_key_file: .ssh/id_rsa
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'RedHat'  
 
 - name: Update and upgrade apt packages
   become: true
@@ -19,13 +21,30 @@
     upgrade: "yes"
     update_cache: yes
     cache_valid_time: 86400
+  when: ansible_distribution == 'Debian'
 
 - name: Install docker.io
   become: true
   apt:
     name: docker.io
     state: latest
+  when: ansible_distribution == 'Debian'
 
+- name: Docker systemd cgroups
+  file:
+    state: directory
+    path: "/etc/docker"
+    mode: '0755'
+
+- name: Copy docker systemd cgroups config
+  copy:
+    src: "{{role_path}}/files/daemon.json"
+    dest: /etc/daemon.json
+    owner: "{{system_user}}"
+    group: "{{system_group}}"
+    mode: '0770'
+    backup: yes
+  
 - name: Start and enable the docker.service
   become: true
   systemd:
@@ -42,15 +61,18 @@
   debug:
     var: result_docker_service
 
+# Debian specific actions
 - name: Add apt-key for Kubernetes
   apt_key:
     url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
     state: present
+  when: ansible_distribution == 'Debian'
 
 - name: Add Software Repositories
   apt_repository:
     repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
     state: present
+  when: ansible_distribution == 'Debian'
 
 - name: Package installation
   apt:
@@ -58,6 +80,32 @@
     - kubeadm
     - kubelet
     - kubectl
+  when: ansible_distribution == 'Debian'
+
+# Redhat specific actions
+- name: Add repository for Kubernetes
+  yum_repository:
+    name: kubernetes
+    description: Kubernetes YUM repo
+    baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+    gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+    gpgcheck: yes
+  when: ansible_distribution == 'RedHat'
+
+- name: Package installation
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+    - kubeadm
+    - kubelet
+    - kubectl
+  when: ansible_distribution == 'RedHat'
+
+- name: Enable kubelet
+  become: yes
+  shell: |
+    systemctl enable --now kubelet
 
 - name: Disable SWAP
   become: yes

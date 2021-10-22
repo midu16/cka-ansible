@@ -119,17 +119,17 @@
     baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
     gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
     gpgcheck: yes
-  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
+  when: ansible_distribution == 'RedHat'
 
 - name: Package installation
   yum:
     name: "{{ packages }}"
   vars:
     packages:
-    - kubeadm
-    - kubelet
-    - kubectl
-  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
+    - kubernetes-kubeadm
+    - kubernetes-node
+    - kubernetes-client
+  when: ansible_distribution == 'Fedora'
 
 - name: Enable kubelet
   become: yes
@@ -151,6 +151,16 @@
 - name: Set system hostname
   hostname:
     name: "{{inventory_hostname}}"
+
+- name: kubelet version
+  shell: |
+    kubelet --version | awk '{ print $2 }'
+  register: kubelet_version
+  when: "inventory_hostname in groups['master']"
+ 
+- name: Showing the kubelet_version
+  debug:
+    var: kubelet_version
 
 - name: Copy the kubeadm-config
   copy:

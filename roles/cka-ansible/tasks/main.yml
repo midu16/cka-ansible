@@ -34,20 +34,22 @@
     state: latest
   when: ansible_distribution == 'Debian'
  
+- name: Add repository for docker-ce
+  copy:
+    src: "{{role_path}}/files/docker-ce.repo"
+    dest: /etc/yum.repos.d/docker-ce.repo
+    owner: "root"
+    group: "root"
+    mode: '0770'
+    backup: yes
+  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
+  
 - name: Upgrade all packages
   yum:
     name: '*'
     state: latest
   when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
 
-- name: Add repository for docker-ce
-  yum_repository:
-    name: docker-ce
-    description: docker-ce YUM repo
-    baseurl: https://download.docker.com/linux/fedora/docker-ce.repo
-    gpgcheck: yes
-  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
-  
 - name: Install docker.io
   yum:
     name: "{{ packages }}"
@@ -55,7 +57,6 @@
     packages:
     - docker-ce 
     - docker-ce-cli 
-    - containerd.io
   when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
 
 - name: Docker systemd cgroups

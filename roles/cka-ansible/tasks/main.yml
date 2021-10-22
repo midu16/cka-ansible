@@ -4,7 +4,7 @@
   group:
     name: "{{system_group}}"
     state: present
-  when: ansible_distribution == 'Debian' or ansible_distribution == 'RedHat'
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
 
 - name: Create the systemuser
   user:
@@ -13,7 +13,7 @@
     group: "{{system_group}}"
     generate_ssh_key: yes
     ssh_key_file: .ssh/id_rsa
-  when: ansible_distribution == 'Debian' or ansible_distribution == 'RedHat'  
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
 
 - name: Update and upgrade apt packages
   become: true
@@ -23,12 +23,40 @@
     cache_valid_time: 86400
   when: ansible_distribution == 'Debian'
 
+- name: Showing the distribution
+  debug:
+    var: ansible_distribution
+    
 - name: Install docker.io
   become: true
   apt:
     name: docker.io
     state: latest
   when: ansible_distribution == 'Debian'
+ 
+- name: Upgrade all packages
+  yum:
+    name: '*'
+    state: latest
+  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
+
+- name: Add repository for docker-ce
+  yum_repository:
+    name: docker-ce
+    description: docker-ce YUM repo
+    baseurl: https://download.docker.com/linux/fedora/docker-ce.repo
+    gpgcheck: yes
+  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
+  
+- name: Install docker.io
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+    - docker-ce 
+    - docker-ce-cli 
+    - containerd.io
+  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
 
 - name: Docker systemd cgroups
   file:
@@ -39,9 +67,9 @@
 - name: Copy docker systemd cgroups config
   copy:
     src: "{{role_path}}/files/daemon.json"
-    dest: /etc/daemon.json
-    owner: "{{system_user}}"
-    group: "{{system_group}}"
+    dest: /etc/docker/daemon.json
+    owner: "root"
+    group: "root"
     mode: '0770'
     backup: yes
   
@@ -90,7 +118,7 @@
     baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
     gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
     gpgcheck: yes
-  when: ansible_distribution == 'RedHat'
+  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
 
 - name: Package installation
   yum:
@@ -100,7 +128,7 @@
     - kubeadm
     - kubelet
     - kubectl
-  when: ansible_distribution == 'RedHat'
+  when: ansible_distribution == 'RedHat' or ansible_distribution == 'Fedora'
 
 - name: Enable kubelet
   become: yes

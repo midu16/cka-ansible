@@ -162,14 +162,23 @@
   debug:
     var: kubelet_version
 
-- name: Copy the kubeadm-config
-  copy:
-    src: "{{role_path}}/files/kubeadm-config.yaml"
+- name: Adding the kubeadm-config
+  template:
+    src: "{{role_path}}/files/kubeadm-config.yaml.j2"
     dest: /tmp/kubeadm-config.yaml
     owner: "{{system_user}}"
     group: "{{system_group}}"
     mode: '0770'
-    backup: yes
+  when: "inventory_hostname in groups['master']"
+
+#- name: Copy the kubeadm-config
+#  copy:
+#  src: "{{role_path}}/files/kubeadm-config.yaml"
+#    dest: /tmp/kubeadm-config.yaml
+#    owner: "{{system_user}}"
+#    group: "{{system_group}}"
+#    mode: '0770'
+#    backup: yes
 
 - name: Initialize the cluster
   shell: |
